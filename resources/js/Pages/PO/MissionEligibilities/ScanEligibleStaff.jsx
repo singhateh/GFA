@@ -10,31 +10,53 @@ const ScanEligibleStaff = ({ mission }) => {
     const [scanOption, setScanOption] = useState('individual'); // Default to individual scan
     const [selectedDepartment, setSelectedDepartment] = useState('');
     const [departments, setDepartments] = useState([]);
-
+    const [getAllEligibleStaff, setGetAllEligibleStaff] = useState(false);
 
     useEffect(() => {
-        const fetchEligibleStaff = async () => {
-            try {
-                setLoading(true);
-                const response = await axios.get(`/peacekeeping/mission-eligibility/eligible-staff/info/${mission}`);
-                const data = response.data;
-
-                const eligibleStaffData = data.eligibleStaff;
-
-                setStaffList(eligibleStaffData);
-
-                // Extract unique departments
-                const uniqueDepartments = [...new Set(eligibleStaffData.map(staff => staff.department))];
-                setDepartments(uniqueDepartments);
-            } catch (error) {
-                console.error("Error fetching eligible staff:", error);
-            } finally {
-                setLoading(false);
-            }
-        };
+        if (!mission) return; // Ensure mission is defined
 
         fetchEligibleStaff();
     }, [mission]);
+
+    const fetchEligibleStaff = async () => {
+        setLoading(true);
+        try {
+            const response = await axios.get(`/peacekeeping/mission-eligibility/eligible-staff/info/${mission}`, {
+                params: {
+                    department_id: selectedDepartment,  // Pass department_id if it's selected
+                }
+            });
+
+            const eligibleStaffData = response.data?.eligibleStaff || [];
+
+            if (getAllEligibleStaff) {
+                setStaffList(eligibleStaffData);
+            }
+
+            // Extract unique departments by their id, name, and code
+            const uniqueDepartments = [
+                ...new Map(
+                    eligibleStaffData.map(staff => [
+                        `${staff?.department?.id}-${staff?.department?.name}-${staff?.department?.code}`,
+                        {
+                            id: staff?.department?.id,
+                            name: staff?.department?.name,
+                            code: staff?.department?.code
+                        }
+                    ])
+                ).values(),
+            ];
+
+            if (selectedDepartment === '') {
+                setDepartments(uniqueDepartments);
+            }
+
+        } catch (error) {
+            console.error("Error fetching eligible staff:", error);
+        } finally {
+            setLoading(false);
+        }
+    };
 
 
     // Function to handle scanning based on selected option
@@ -46,18 +68,22 @@ const ScanEligibleStaff = ({ mission }) => {
 
     // Function to scan all eligible staff
     const handleScanAll = () => {
-        staffList.forEach((staff) => {
-            Inertia.post(`/scan-staff/${staff.id}`, { mission: mission });
-        });
+        setGetAllEligibleStaff(true);
+        fetchEligibleStaff();
     };
 
     // Function to scan based on selected department
     const handleScanByDepartment = () => {
-        const staffInDepartment = staffList.filter(staff => staff?.department === selectedDepartment);
-        staffInDepartment.forEach((staff) => {
-            Inertia.post(`/scan-staff/${staff.id}`, { mission: mission });
-        });
+        fetchEligibleStaff();
+
     };
+
+
+    const handleChange = (e) => {
+        setScanOption(e.target.value);
+        setStaffList([]);
+    };
+
 
     return (
         <AuthenticatedLayout>
@@ -84,7 +110,7 @@ const ScanEligibleStaff = ({ mission }) => {
                     <select
                         id="scanOption"
                         value={scanOption}
-                        onChange={(e) => setScanOption(e.target.value)}
+                        onChange={handleChange}
                         className="w-full p-3 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
                     >
                         <option value="individual">Individually</option>
@@ -105,8 +131,11 @@ const ScanEligibleStaff = ({ mission }) => {
                         >
                             <option value="">Select Department</option>
                             {departments.map((department, index) => (
-                                <option key={index} value={department}>{department}</option>
+                                <option key={department.id || index} value={department.id}>
+                                    {department.name}
+                                </option>
                             ))}
+
                         </select>
                     </div>
                 )}
@@ -118,14 +147,28 @@ const ScanEligibleStaff = ({ mission }) => {
                     <div>
                         <ul>
                             {staffList.length === 0 ? (
-                                <li className="text-center text-lg text-gray-600 dark:text-gray-300">No eligible staff found for this mission.</li>
+                                <li className="text-center text-lg text-gray-600 dark:text-gray-300">
+                                    No eligible staff found for this mission.
+                                </li>
                             ) : (
-                                staffList.map((staff) => (
-                                    <li key={staff.id} className="flex justify-between items-center p-3 mb-2 bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 rounded-lg shadow-sm">
+                                // Render staff list based on department selection
+                                (scanOption !== "department" || selectedDepartment) &&
+                                staffList.filter(staff =>
+                                    scanOption !== "department" || staff?.department?.id == selectedDepartment
+                                ).map((staff) => (
+                                    <li
+                                        key={staff.id}
+                                        className="flex justify-between items-center p-3 mb-2 bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 rounded-lg shadow-sm"
+                                    >
                                         <div>
-                                            <p>{staff.name} <span className="text-gray-500 dark:text-gray-400">({staff.department})</span></p>
+                                            <p>
+                                                {staff.name}{" "} <strong>{staff.army_number}</strong>{" "}
+                                                <span className="text-gray-500 dark:text-gray-400">
+                                                    ({staff.department?.name || "Unknown"})
+                                                </span>
+                                            </p>
                                         </div>
-                                        {scanOption === 'individual' && (
+                                        {scanOption === "individual" && (
                                             <button
                                                 onClick={() => handleScanStaff(staff.id)}
                                                 className="ml-4 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 focus:outline-none transition-colors"
@@ -163,6 +206,7 @@ const ScanEligibleStaff = ({ mission }) => {
                         )}
                     </div>
                 )}
+
             </div>
         </AuthenticatedLayout>
     );

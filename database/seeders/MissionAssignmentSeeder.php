@@ -1,49 +1,35 @@
 <?php
 
-
 namespace Database\Seeders;
 
-
-use App\Models\MissionAssignment;
-use App\Models\StaffMember; // Assuming this model exists
-use App\Models\Mission; // Assuming this model exists
 use Illuminate\Database\Seeder;
 use Carbon\Carbon;
+use App\Models\StaffMember;
+use App\Models\Mission;
+use App\Models\MissionAssignment;
 
 class MissionAssignmentSeeder extends Seeder
 {
-    /**
-     * Run the database seeds.
-     *
-     * @return void
-     */
     public function run()
     {
-        // You can retrieve the staff members and missions that already exist
         $staffMembers = StaffMember::all();
         $missions = Mission::all();
+        $roles = ['Leader', 'Member', 'Advisor', 'Support']; // Define possible roles
 
-        // Example assignments for staff members to missions
         foreach ($staffMembers as $staff) {
-            // Assigning staff members to random missions with roles and start dates
-            MissionAssignment::create([
-                'staff_member_id' => $staff->id,
-                'mission_id' => $missions->random()->id,
-                'role' => $this->getRandomRole(), // Generate or select random role
-                'assignment_start_date' => Carbon::now()->toDateString(),
-                'assignment_end_date' => Carbon::now()->addMonths(3)->toDateString(), // Example end date, 3 months from start
-            ]);
-        }
-    }
+            // 70% chance to assign a mission (some staff will remain "new")
+            if (rand(0, 100) < 70) {
+                $endDate = Carbon::now()->subYears(rand(4, 10))->toDateString();
+                $startDate = Carbon::parse($endDate)->subMonths(rand(3, 12))->toDateString();
 
-    /**
-     * Generate random role for the assignment.
-     *
-     * @return string
-     */
-    private function getRandomRole()
-    {
-        $roles = ['Leader', 'Coordinator', 'Member', 'Specialist', 'Observer'];
-        return $roles[array_rand($roles)];
+                MissionAssignment::create([
+                    'staff_member_id' => $staff->id,
+                    'mission_id' => $missions->random()->id,
+                    'role' => $roles[array_rand($roles)], // Assign a random role
+                    'assignment_start_date' => $startDate,
+                    'assignment_end_date' => $endDate,
+                ]);
+            }
+        }
     }
 }

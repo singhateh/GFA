@@ -10,9 +10,6 @@ class AssetSeeder extends Seeder
 {
     public function run()
     {
-        // Truncate the table before seeding
-        Asset::truncate();
-
         // Get all asset types and pick a random one
         $assetTypes = AssetType::all();
 

@@ -9,9 +9,6 @@ class UnitSeeder extends Seeder
 {
     public function run()
     {
-        // Truncate the table before seeding
-        Unit::truncate();
-
         // Insert new records
         Unit::insert([
             ['unit_name' => '1st Infantry Battalion', 'location' => 'Yundum Barracks', 'unit_type' => 'Infantry', 'unit_description' => 'Ground combat troops.'],
